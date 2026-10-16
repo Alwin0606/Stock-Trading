@@ -1,0 +1,323 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock Trading Platform</title>
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+body {
+    background: #0b1120;
+    color: white;
+    padding: 25px;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+h1 span { color: #00e5a0; }
+
+.card {
+    background: #151e30;
+    padding: 22px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.balance {
+    font-size: 30px;
+    color: #00e5a0;
+    margin-top: 12px;
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+button {
+    background: #00c98d;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-weight: bold;
+    color: #06130f;
+}
+
+button:hover { opacity: 0.8; }
+
+input {
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #344158;
+    background: #0b1120;
+    color: white;
+    width: 100%;
+    margin: 8px 0 12px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+th, td {
+    padding: 14px 8px;
+    text-align: left;
+    border-bottom: 1px solid #293449;
+}
+
+th { color: #9eabc0; }
+
+.green { color: #00e5a0; }
+.red { color: #ff667a; }
+
+.layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+}
+
+@media(max-width: 750px) {
+    .layout { grid-template-columns: 1fr; }
+    body { padding: 12px; }
+    th, td { padding: 10px 4px; font-size: 13px; }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>📈 Stock<span>Pro</span></h1>
+    <p>Market: <span class="green">● Demo Mode</span></p>
+</header>
+
+<div class="stats">
+    <div class="card">
+        <p>Available Balance</p>
+        <div class="balance" id="balance">$10,000.00</div>
+    </div>
+    <div class="card">
+        <p>Portfolio Value</p>
+        <div class="balance" id="portfolio">$10,000.00</div>
+    </div>
+    <div class="card">
+        <p>Total Profit / Loss</p>
+        <div class="balance" id="profit">$0.00</div>
+    </div>
+</div>
+
+<div class="layout">
+    <div class="card">
+        <h2>📊 Stock Market</h2>
+        <p style="color:#9eabc0;margin-top:8px">
+            Sample prices only — not live market data.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Stock</th>
+                    <th>Price</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="stocks"></tbody>
+        </table>
+
+        <h2 style="margin-top:30px">💼 My Holdings</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Stock</th>
+                    <th>Shares</th>
+                    <th>Value</th>
+                    <th>Sell</th>
+                </tr>
+            </thead>
+            <tbody id="holdings"></tbody>
+        </table>
+    </div>
+
+    <div>
+        <div class="card">
+            <h2>💸 Buy Stock</h2>
+            <label>Stock Symbol</label>
+            <input id="symbol" placeholder="Example: AAPL">
+
+            <label>Number of Shares</label>
+            <input id="quantity" type="number" min="1" step="1" value="1">
+
+            <button onclick="buyStock()">Buy Shares</button>
+            <p id="message" style="margin-top:15px"></p>
+        </div>
+
+        <div class="card">
+            <h2>📜 Transaction History</h2>
+            <div id="history" style="margin-top:15px">
+                No transactions yet.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const stocks = {
+    AAPL: { name: "Apple", price: 230 },
+    TSLA: { name: "Tesla", price: 320 },
+    MSFT: { name: "Microsoft", price: 510 },
+    GOOGL: { name: "Alphabet", price: 190 },
+    AMZN: { name: "Amazon", price: 220 }
+};
+
+let balance = 10000;
+let holdings = {};
+let transactions = [];
+
+const money = n => "$" + n.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+});
+
+function render() {
+    document.getElementById("stocks").innerHTML =
+        Object.entries(stocks).map(([symbol, stock]) => `
+            <tr>
+                <td><b>${symbol}</b><br>
+                    <small>${stock.name}</small></td>
+                <td>${money(stock.price)}</td>
+                <td><button onclick="quickBuy('${symbol}')">Buy</button></td>
+            </tr>
+        `).join("");
+
+    let portfolioValue = 0;
+    let costBasis = 0;
+
+    document.getElementById("holdings").innerHTML =
+        Object.entries(holdings)
+        .filter(([symbol, h]) => h.qty > 0)
+        .map(([symbol, h]) => {
+            const value = h.qty * stocks[symbol].price;
+            portfolioValue += value;
+            costBasis += h.qty * h.avg;
+            return `<tr>
+                <td>${symbol}</td>
+                <td>${h.qty}</td>
+                <td>${money(value)}</td>
+                <td><button onclick="sellStock('${symbol}')">Sell 1</button></td>
+            </tr>`;
+        }).join("") || `<tr><td colspan="4">No holdings yet.</td></tr>`;
+
+    const profit = portfolioValue - costBasis;
+
+    document.getElementById("balance").textContent = money(balance);
+    document.getElementById("portfolio").textContent =
+        money(balance + portfolioValue);
+
+    const profitEl = document.getElementById("profit");
+    profitEl.textContent = money(profit);
+    profitEl.className = "balance " + (profit >= 0 ? "green" : "red");
+
+    document.getElementById("history").innerHTML =
+        transactions.length
+        ? transactions.slice().reverse().map(t =>
+            `<p style="margin-bottom:12px">
+                <b>${t.action} ${t.symbol}</b><br>
+                ${t.qty} share(s) · ${money(t.total)}
+            </p>`
+        ).join("")
+        : "No transactions yet.";
+}
+
+function quickBuy(symbol) {
+    document.getElementById("symbol").value = symbol;
+    document.getElementById("quantity").value = 1;
+    buyStock();
+}
+
+function buyStock() {
+    const symbol = document.getElementById("symbol")
+        .value.trim().toUpperCase();
+    const qty = Number(document.getElementById("quantity").value);
+    const stock = stocks[symbol];
+    const message = document.getElementById("message");
+
+    if (!stock) {
+        message.textContent = "Please choose a listed stock symbol.";
+        message.className = "red";
+        return;
+    }
+
+    if (!Number.isSafeInteger(qty) || qty <= 0) {
+        message.textContent = "Enter a valid whole number of shares.";
+        message.className = "red";
+        return;
+    }
+
+    const total = stock.price * qty;
+
+    if (total > balance) {
+        message.textContent = "Insufficient demo balance!";
+        message.className = "red";
+        return;
+    }
+
+    const previous = holdings[symbol] || { qty: 0, avg: 0 };
+    holdings[symbol] = {
+        qty: previous.qty + qty,
+        avg: (previous.qty * previous.avg + total) /
+             (previous.qty + qty)
+    };
+
+    balance -= total;
+    transactions.push({ action: "Bought", symbol, qty, total });
+    message.textContent = "Purchase successful! (Demo only)";
+    message.className = "green";
+    render();
+}
+
+function sellStock(symbol) {
+    if (!holdings[symbol] || holdings[symbol].qty < 1) return;
+
+    const stock = stocks[symbol];
+    const total = stock.price;
+
+    holdings[symbol].qty -= 1;
+    balance += total;
+    transactions.push({
+        action: "Sold",
+        symbol,
+        qty: 1,
+        total
+    });
+
+    document.getElementById("message").textContent =
+        "Sale successful! (Demo only)";
+    document.getElementById("message").className = "green";
+    render();
+}
+
+render();
+</script>
+
+</body>
+</html>
